@@ -1,0 +1,12 @@
+{
+  "appId": "fury.fluxer.temp",
+  "appName": "Fluxer",
+  "webDir": "www",
+  "server": {
+    "url": "https://web.fluxer.app",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

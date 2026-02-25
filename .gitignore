@@ -1,0 +1,47 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# Web Build
+dist/
+www/
+build/
+
+# Android
+android/app/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+android/app/debug/
+*.apk
+*.aar
+*.jks
+
+# Capacitor
+capacitor.config.json.bak
+capacitor-cordova-assets/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Env
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Flutter Cleanup (Leftover from previous phase)
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/

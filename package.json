@@ -1,0 +1,27 @@
+{
+  "name": "fluxer-native",
+  "version": "0.0.1",
+  "description": "Pure Native Capacitor Wrapper for Fluxer",
+  "scripts": {
+    "sync": "npx cap sync android",
+    "build": "export ANDROID_HOME=$PREFIX/opt/Android/sdk && export JAVA_HOME=$PREFIX/lib/jvm/java-17-openjdk && export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH && cd android && ./gradlew assembleDebug -Dandroid.aapt2.executable=$PREFIX/bin/aapt2",
+    "build:release": "export ANDROID_HOME=$PREFIX/opt/Android/sdk && export JAVA_HOME=$PREFIX/lib/jvm/java-17-openjdk && export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH && cd android && ./gradlew assembleRelease -Dandroid.aapt2.executable=$PREFIX/bin/aapt2",
+    "open": "termux-open android/app/build/outputs/apk/debug/app-debug.apk",
+    "open:release": "termux-open android/app/build/outputs/apk/release/app-release.apk",
+    "release": "npm run sync && npm run build && npm run open",
+    "release:signed": "npm run sync && npm run build:release && npm run open:release"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/camera": "^6.1.2",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/device": "^6.0.2",
+    "@capacitor/filesystem": "^6.0.3",
+    "@capacitor/share": "^6.0.2",
+    "@capacitor/status-bar": "^6.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

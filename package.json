@@ -7,7 +7,7 @@
     "build": "export ANDROID_HOME=$PREFIX/opt/Android/sdk && export JAVA_HOME=$PREFIX/lib/jvm/java-17-openjdk && export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH && cd android && ./gradlew assembleDebug -Dandroid.aapt2.executable=$PREFIX/bin/aapt2",
     "build:release": "export ANDROID_HOME=$PREFIX/opt/Android/sdk && export JAVA_HOME=$PREFIX/lib/jvm/java-17-openjdk && export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH && cd android && ./gradlew assembleRelease -Dandroid.aapt2.executable=$PREFIX/bin/aapt2",
     "open": "termux-open android/app/build/outputs/apk/debug/app-debug.apk",
-    "open:release": "termux-open android/app/build/outputs/apk/release/app-release.apk",
+    "open:release": "termux-open android/app/build/outputs/apk/release/*.apk",
     "release": "npm run sync && npm run build && npm run open",
     "release:signed": "npm run sync && npm run build:release && npm run open:release"
   },

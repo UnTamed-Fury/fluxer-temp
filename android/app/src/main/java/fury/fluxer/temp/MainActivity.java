@@ -3,8 +3,13 @@ package fury.fluxer.temp;
 import android.app.Dialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -33,9 +38,7 @@ import android.widget.Toast;
 import com.getcapacitor.BridgeActivity;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public class MainActivity extends BridgeActivity {
     private TextView urlDisplay;
@@ -44,9 +47,8 @@ public class MainActivity extends BridgeActivity {
     private boolean isUIInjected = false;
     private String lastKnownUrl = "";
     private final String THEME_COLOR = "#4641D9";
-    private final String DARK_BG = "#121212";
+    private final String DARK_BG = "#000000";
     
-    // Settings State
     private boolean isDesktopMode = false;
     private List<String> historyList = new ArrayList<>();
     private SharedPreferences prefs;
@@ -54,9 +56,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prefs = getSharedPreferences("fluxer_settings", MODE_PRIVATE);
+        prefs = getSharedPreferences("fluxer_v3_settings", MODE_PRIVATE);
         loadHistory();
-        cleanupHistory(); // Auto-vanish on start
     }
 
     @Override
@@ -66,17 +67,41 @@ public class MainActivity extends BridgeActivity {
         if (webView == null) return;
         webView.setBackgroundColor(Color.BLACK);
         
-        // Apply custom User Agent if set
         String customUA = prefs.getString("user_agent", "");
-        if (!customUA.isEmpty()) {
-            webView.getSettings().setUserAgentString(customUA);
-        }
+        if (!customUA.isEmpty()) webView.getSettings().setUserAgentString(customUA);
 
         setupBridge(webView);
-        new Handler(Looper.getMainLooper()).postDelayed(this::injectPremiumShell, 800);
+        new Handler(Looper.getMainLooper()).postDelayed(this::injectSolidStateUI, 800);
     }
 
-    private void injectPremiumShell() {
+    private BitmapDrawable getSolidIcon(String type, float d) {
+        int size = (int)(24 * d);
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+        paint.setColor(Color.WHITE);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(true);
+
+        Path path = new Path();
+        if (type.equals("refresh")) {
+            canvas.drawCircle(size/2, size/2, size/3, paint);
+            paint.setColor(Color.parseColor(THEME_COLOR));
+            canvas.drawCircle(size/2, size/2, size/4, paint);
+        } else if (type.equals("menu")) {
+            canvas.drawCircle(size/4, size/2, 3*d, paint);
+            canvas.drawCircle(size/2, size/2, 3*d, paint);
+            canvas.drawCircle(3*size/4, size/2, 3*d, paint);
+        } else if (type.equals("back")) {
+            path.moveTo(size*0.7f, size*0.2f);
+            path.lineTo(size*0.3f, size*0.5f);
+            path.lineTo(size*0.7f, size*0.8f);
+            canvas.drawPath(path, paint);
+        }
+        return new BitmapDrawable(getResources(), bitmap);
+    }
+
+    private void injectSolidStateUI() {
         if (isUIInjected) return;
         final WebView webView = (WebView) this.bridge.getWebView();
         if (webView == null || webView.getParent() == null) return;
@@ -89,7 +114,6 @@ public class MainActivity extends BridgeActivity {
         topBar.setLayoutParams(new LinearLayout.LayoutParams(-1, barHeight));
         topBar.setBackgroundColor(Color.parseColor(THEME_COLOR));
 
-        // URL Display (Centered)
         urlDisplay = new TextView(this);
         RelativeLayout.LayoutParams lpUrl = new RelativeLayout.LayoutParams(-1, -2);
         lpUrl.addRule(RelativeLayout.CENTER_IN_PARENT);
@@ -106,11 +130,24 @@ public class MainActivity extends BridgeActivity {
         urlDisplay.setText("web.fluxer.app");
         topBar.addView(urlDisplay);
 
-        // Buttons
-        topBar.addView(createIconBtn(R.drawable.ic_refresh, d, btnSize, true, v -> webView.reload()));
-        topBar.addView(createIconBtn(R.drawable.ic_more_horiz, d, btnSize, false, v -> showMainMenu(webView)));
+        ImageView btnRefresh = new ImageView(this);
+        btnRefresh.setImageDrawable(getSolidIcon("refresh", d));
+        btnRefresh.setPadding((int)(8*d), (int)(8*d), (int)(8*d), (int)(8*d));
+        btnRefresh.setOnClickListener(v -> webView.reload());
+        RelativeLayout.LayoutParams lpR = new RelativeLayout.LayoutParams(btnSize, btnSize);
+        lpR.addRule(RelativeLayout.ALIGN_PARENT_START);
+        btnRefresh.setLayoutParams(lpR);
+        topBar.addView(btnRefresh);
 
-        // Layout Injection
+        ImageView btnMenu = new ImageView(this);
+        btnMenu.setImageDrawable(getSolidIcon("menu", d));
+        btnMenu.setPadding((int)(8*d), (int)(8*d), (int)(8*d), (int)(8*d));
+        btnMenu.setOnClickListener(v -> showHamburgerMenu(webView));
+        RelativeLayout.LayoutParams lpM = new RelativeLayout.LayoutParams(btnSize, btnSize);
+        lpM.addRule(RelativeLayout.ALIGN_PARENT_END);
+        btnMenu.setLayoutParams(lpM);
+        topBar.addView(btnMenu);
+
         ViewGroup root = findViewById(android.R.id.content);
         if (root.getChildCount() > 0) {
             View capacitorView = root.getChildAt(0);
@@ -128,207 +165,168 @@ public class MainActivity extends BridgeActivity {
         startUrlPolling(webView);
     }
 
-    private ImageView createIconBtn(int resId, float d, int size, boolean left, View.OnClickListener listener) {
-        ImageView btn = new ImageView(this);
-        btn.setImageResource(resId);
-        btn.setPadding((int)(8*d), (int)(8*d), (int)(8*d), (int)(8*d));
-        btn.setOnClickListener(listener);
-        RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(size, size);
-        lp.addRule(left ? RelativeLayout.ALIGN_PARENT_START : RelativeLayout.ALIGN_PARENT_END);
-        btn.setLayoutParams(lp);
-        return btn;
-    }
-
-    private void showMainMenu(WebView webView) {
-        final Dialog dialog = createPremiumDialog(Gravity.TOP | Gravity.END);
-        float d = getResources().getDisplayMetrics().density;
-        LinearLayout root = createDialogContainer(d);
-
-        root.addView(createMenuRow("History", R.drawable.ic_history, d, v -> { dialog.dismiss(); showHistoryPanel(webView); }));
+    private void showHamburgerMenu(WebView webView) {
+        final Dialog d = new Dialog(this);
+        d.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        d.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        d.getWindow().setGravity(Gravity.TOP | Gravity.END);
         
-        // Desktop Mode Toggle
-        LinearLayout desktopRow = createMenuRow("Desktop Mode", R.drawable.ic_desktop, d, v -> {
+        float den = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.parseColor("#1A1A1A"));
+        root.setPadding((int)(20*den), (int)(20*den), (int)(20*den), (int)(20*den));
+
+        root.addView(createMenuRow("🕒 History", den, v -> { d.dismiss(); showHistoryPanel(webView); }));
+        root.addView(createMenuRow("🖥️ Desktop Mode", den, v -> {
             isDesktopMode = !isDesktopMode;
             applyDesktopMode(webView, isDesktopMode);
-            dialog.dismiss();
-        });
-        CheckBox cb = new CheckBox(this);
-        cb.setChecked(isDesktopMode);
-        cb.setClickable(false);
-        desktopRow.addView(cb);
-        root.addView(desktopRow);
+            d.dismiss();
+        }));
+        root.addView(createMenuRow("📡 Status", den, v -> { webView.loadUrl("https://fluxerstatus.com/"); d.dismiss(); }));
+        root.addView(createMenuRow("📝 Blog", den, v -> { webView.loadUrl("https://blog.fluxer.app/"); d.dismiss(); }));
+        root.addView(createMenuRow("⚙️ Settings", den, v -> { d.dismiss(); showSettingsPage(webView); }));
 
-        root.addView(createMenuRow("Status", R.drawable.ic_numbers, d, v -> { webView.loadUrl("https://fluxerstatus.com/"); dialog.dismiss(); }));
-        root.addView(createMenuRow("Blog", R.drawable.ic_news, d, v -> { webView.loadUrl("https://blog.fluxer.app/"); dialog.dismiss(); }));
-        root.addView(createMenuRow("Settings", R.drawable.ic_settings, d, v -> { dialog.dismiss(); showSettingsPanel(webView); }));
+        d.setContentView(root);
+        d.show();
+    }
 
+    private void showSettingsPage(WebView webView) {
+        final Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        float d = getResources().getDisplayMetrics().density;
+        
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.BLACK);
+        root.setPadding((int)(20*d), (int)(20*d), (int)(20*d), (int)(20*d));
+
+        RelativeLayout header = new RelativeLayout(this);
+        ImageView back = new ImageView(this);
+        back.setImageDrawable(getSolidIcon("back", d));
+        back.setOnClickListener(v -> dialog.dismiss());
+        header.addView(back, new RelativeLayout.LayoutParams((int)(35*d), (int)(35*d)));
+        TextView title = new TextView(this);
+        title.setText("Settings");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(20);
+        RelativeLayout.LayoutParams lpT = new RelativeLayout.LayoutParams(-2, -2);
+        lpT.addRule(RelativeLayout.CENTER_IN_PARENT);
+        title.setLayoutParams(lpT);
+        header.addView(title);
+        root.addView(header);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+
+        addSection(content, "History Engine", d);
+        content.addView(createInput("Limit", "30", "history_limit", d));
+        content.addView(createInput("Vanish after (Days)", "7", "history_days", d));
+        content.addView(createToggle("Vanish Mode Enabled", "history_vanish", d));
+
+        addSection(content, "Browser Identity", d);
+        content.addView(createInput("Custom User Agent", "set up your custom user agent", "user_agent", d));
+
+        addSection(content, "Permissions Dashboard", d);
+        content.addView(createToggle("Notifications", "perm_notif", d));
+        content.addView(createToggle("Camera Access", "perm_camera", d));
+        content.addView(createToggle("Microphone Access", "perm_mic", d));
+        content.addView(createToggle("Storage Access", "perm_storage", d));
+
+        addSection(content, "System", d);
+        content.addView(createMenuRow("Check for Updates", d, v -> {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/UnTamed-Fury/fluxer-temp/releases")));
+        }));
+        content.addView(createMenuRow("About Us", d, v -> {
+            Toast.makeText(this, "About Us page coming soon!", Toast.LENGTH_SHORT).show();
+        }));
+
+        scroll.addView(content);
+        root.addView(scroll);
         dialog.setContentView(root);
         dialog.show();
     }
 
-    private void showSettingsPanel(WebView webView) {
-        final Dialog dialog = createPremiumDialog(Gravity.BOTTOM);
-        float d = getResources().getDisplayMetrics().density;
-        
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout root = createDialogContainer(d);
-        root.setPadding((int)(25*d), (int)(25*d), (int)(25*d), (int)(25*d));
-
-        addSectionHeader(root, "History Settings", d);
-        root.addView(createSettingInput("Limit (Max entries)", "30", InputType.TYPE_CLASS_NUMBER, "history_limit", d));
-        root.addView(createSettingInput("Vanish after (Days)", "7", InputType.TYPE_CLASS_NUMBER, "history_days", d));
-        root.addView(createToggleRow("Vanish Mode", "history_vanish_enabled", d));
-
-        addSectionHeader(root, "Browser Identity", d);
-        root.addView(createSettingInput("Custom User Agent", "set up your custom user agent", InputType.TYPE_CLASS_TEXT, "user_agent", d));
-
-        addSectionHeader(root, "Permissions Center", d);
-        root.addView(createToggleRow("Notifications", "perm_notif", d));
-        root.addView(createToggleRow("Camera Access", "perm_camera", d));
-        root.addView(createToggleRow("Microphone Access", "perm_mic", d));
-        root.addView(createToggleRow("Storage Access", "perm_storage", d));
-
-        addSectionHeader(root, "App Ecosystem", d);
-        root.addView(createMenuRow("Check for Updates", R.drawable.ic_refresh, d, v -> {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/UnTamed-Fury/fluxer-temp/releases"));
-            startActivity(intent);
-        }));
-        root.addView(createMenuRow("About Us", R.drawable.ic_info, d, v -> {
-            Toast.makeText(this, "About Us page coming in next update!", Toast.LENGTH_SHORT).show();
-        }));
-
-        scroll.addView(root);
-        dialog.setContentView(scroll);
-        dialog.show();
-    }
-
     private void showHistoryPanel(WebView webView) {
-        final Dialog dialog = createPremiumDialog(Gravity.BOTTOM);
-        float d = getResources().getDisplayMetrics().density;
-        LinearLayout root = createDialogContainer(d);
+        final Dialog d = new Dialog(this);
+        d.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        d.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        d.getWindow().setGravity(Gravity.TOP | Gravity.END);
         
+        float den = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.parseColor("#1A1A1A"));
+        root.setPadding((int)(15*den), (int)(15*den), (int)(15*den), (int)(15*den));
+        root.setLayoutParams(new ViewGroup.LayoutParams((int)(250*den), (int)(400*den)));
+
         TextView title = new TextView(this);
-        title.setText("Browser History");
+        title.setText("History");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(18);
-        title.setPadding(0, 0, 0, (int)(15*d));
+        title.setGravity(Gravity.CENTER);
         root.addView(title);
 
         ScrollView scroll = new ScrollView(this);
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
-        
         for (String url : historyList) {
-            TextView item = new TextView(this);
-            item.setText(url.replace("https://", ""));
-            item.setTextColor(Color.LTGRAY);
-            item.setPadding(0, (int)(12*d), 0, (int)(12*d));
-            item.setOnClickListener(v -> { webView.loadUrl(url); dialog.dismiss(); });
-            list.addView(item);
+            list.addView(createMenuRow(url.replace("https://", ""), den, v -> { webView.loadUrl(url); d.dismiss(); }));
         }
-        
         scroll.addView(list);
-        root.addView(scroll, new LinearLayout.LayoutParams(-1, (int)(300 * d)));
-        dialog.setContentView(root);
-        dialog.show();
+        root.addView(scroll);
+
+        d.setContentView(root);
+        d.show();
     }
 
-    // --- Helper Methods ---
-
-    private Dialog createPremiumDialog(int gravity) {
-        Dialog d = new Dialog(this);
-        d.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        d.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-        d.getWindow().setGravity(gravity);
-        d.getWindow().setLayout(-1, -2);
-        return d;
-    }
-
-    private LinearLayout createDialogContainer(float d) {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable gd = new GradientDrawable();
-        gd.setColor(Color.parseColor(DARK_BG));
-        gd.setCornerRadius(20 * d);
-        root.setBackground(gd);
-        root.setPadding((int)(20*d), (int)(20*d), (int)(20*d), (int)(20*d));
-        return root;
-    }
-
-    private void addSectionHeader(LinearLayout root, String title, float d) {
+    private void addSection(LinearLayout root, String title, float d) {
         TextView tv = new TextView(this);
         tv.setText(title.toUpperCase());
         tv.setTextColor(Color.parseColor(THEME_COLOR));
         tv.setTextSize(10);
-        tv.setTypeface(null, Typeface.BOLD);
-        tv.setPadding(0, (int)(15*d), 0, (int)(5*d));
+        tv.setPadding(0, (int)(25*d), 0, (int)(10*d));
         root.addView(tv);
     }
 
-    private View createSettingInput(String label, String hint, int inputType, String prefKey, float d) {
-        LinearLayout container = new LinearLayout(this);
-        container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(0, (int)(5*d), 0, (int)(5*d));
-
+    private View createInput(String label, String hint, String key, float d) {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
         TextView lbl = new TextView(this);
         lbl.setText(label);
-        lbl.setTextColor(Color.LTGRAY);
-        lbl.setTextSize(13);
-        container.addView(lbl);
-
-        EditText input = new EditText(this);
-        input.setHint(hint);
-        input.setText(prefs.getString(prefKey, ""));
-        input.setTextColor(Color.WHITE);
-        input.setHintTextColor(Color.GRAY);
-        input.setInputType(inputType);
-        input.setTextSize(14);
-        input.addTextChangedListener(new android.text.TextWatcher() {
-            public void afterTextChanged(android.text.Editable s) { prefs.edit().putString(prefKey, s.toString()).apply(); }
+        lbl.setTextColor(Color.GRAY);
+        l.addView(lbl);
+        EditText et = new EditText(this);
+        et.setHint(hint);
+        et.setText(prefs.getString(key, ""));
+        et.setTextColor(Color.WHITE);
+        et.setHintTextColor(Color.DKGRAY);
+        et.addTextChangedListener(new android.text.TextWatcher() {
+            public void afterTextChanged(android.text.Editable s) { prefs.edit().putString(key, s.toString()).apply(); }
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             public void onTextChanged(CharSequence s, int start, int before, int count) {}
         });
-        container.addView(input);
-        return container;
+        l.addView(et);
+        return l;
     }
 
-    private View createToggleRow(String label, String prefKey, float d) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, (int)(10*d), 0, (int)(10*d));
-
-        TextView tv = new TextView(this);
-        tv.setText(label);
-        tv.setTextColor(Color.WHITE);
-        tv.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1.0f));
-        row.addView(tv);
-
-        Switch sw = new Switch(this);
-        sw.setChecked(prefs.getBoolean(prefKey, true));
-        sw.setOnCheckedChangeListener((v, checked) -> prefs.edit().putBoolean(prefKey, checked).apply());
-        row.addView(sw);
-        return row;
+    private View createToggle(String label, String key, float d) {
+        Switch s = new Switch(this);
+        s.setText(label);
+        s.setTextColor(Color.WHITE);
+        s.setChecked(prefs.getBoolean(key, true));
+        s.setOnCheckedChangeListener((v, b) -> prefs.edit().putBoolean(key, b).apply());
+        s.setPadding(0, (int)(10*d), 0, (int)(10*d));
+        return s;
     }
 
-    private LinearLayout createMenuRow(String text, int iconRes, float d, View.OnClickListener listener) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, (int)(10*d), 0, (int)(10*d));
-        row.setOnClickListener(listener);
-
-        ImageView icon = new ImageView(this);
-        icon.setImageResource(iconRes);
-        icon.setLayoutParams(new LinearLayout.LayoutParams((int)(20*d), (int)(20*d)));
-        row.addView(icon);
-
+    private View createMenuRow(String text, float d, View.OnClickListener l) {
         TextView tv = new TextView(this);
         tv.setText(text);
         tv.setTextColor(Color.WHITE);
-        tv.setPadding((int)(10*d), 0, (int)(10*d), 0);
-        row.addView(tv);
-        return row;
+        tv.setTextSize(15);
+        tv.setPadding(0, (int)(15*d), 0, (int)(15*d));
+        tv.setOnClickListener(l);
+        return tv;
     }
 
     private void applyDesktopMode(WebView webView, boolean enabled) {
@@ -345,20 +343,9 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void saveHistory() {
-        int limit = Integer.parseInt(prefs.getString("history_limit", "30").replaceAll("[^0-9]", ""));
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < Math.min(historyList.size(), limit); i++) {
-            sb.append(historyList.get(i)).append(",");
-        }
+        for (int i = 0; i < Math.min(historyList.size(), 30); i++) sb.append(historyList.get(i)).append(",");
         prefs.edit().putString("history", sb.toString()).apply();
-    }
-
-    private void cleanupHistory() {
-        if (prefs.getBoolean("history_vanish_enabled", false)) {
-            // Placeholder for date-based cleanup (requires timestamp storage)
-            // For now, it just respects the limit
-            saveHistory();
-        }
     }
 
     private void setupBridge(WebView webView) {
@@ -372,15 +359,7 @@ public class MainActivity extends BridgeActivity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                // Check preferences before granting
-                String[] resources = request.getResources();
-                boolean allow = true;
-                for (String r : resources) {
-                    if (r.contains("VIDEO_CAPTURE") && !prefs.getBoolean("perm_camera", true)) allow = false;
-                    if (r.contains("AUDIO_CAPTURE") && !prefs.getBoolean("perm_mic", true)) allow = false;
-                }
-                if (allow) MainActivity.this.runOnUiThread(() -> request.grant(resources));
-                else MainActivity.this.runOnUiThread(() -> request.deny());
+                MainActivity.this.runOnUiThread(() -> request.grant(request.getResources()));
             }
         });
     }
@@ -395,8 +374,6 @@ public class MainActivity extends BridgeActivity {
                     String clean = url.replace("https://", "").replace("http://", "").replace("www.", "");
                     if (clean.endsWith("/")) clean = clean.substring(0, clean.length() - 1);
                     urlDisplay.setText(clean);
-                    urlDisplay.setEllipsize(clean.length() > 35 ? TextUtils.TruncateAt.MARQUEE : null);
-                    urlDisplay.setSelected(clean.length() > 35);
                     if (!historyList.contains(url)) {
                         historyList.add(0, url);
                         saveHistory();
